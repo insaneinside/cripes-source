@@ -20,7 +20,7 @@ Rust for now.
 * [ ] Source tracking and lookup
   - [x] Basic types for representing file locations
   - [x] Source storage + retrieval by offset and span
-  - [ ] Line and column ↔offset conversion using per-file indexes (nearly
+  - [ ] Line and column ↔ offset conversion using per-file indexes (nearly
         completed)
   - [ ] Incremental indexing (insufficiently tested)
   - [ ] Support for obtaining span information while parsing (API work needed)
@@ -41,4 +41,3 @@ cripes-source is dual-licensed under both
 the [Apache License version 2.0](LICENSE-Apache) and
 the [MIT License](LICENSE-MIT); derivative works may be made under the terms of
 either license.
-
