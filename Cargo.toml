@@ -1,0 +1,7 @@
+[package]
+name = "cripes-source"
+version = "0.1.0"
+authors = ["Collin J. Sutton <collin.sutton@gmail.com>"]
+
+[dependencies]
+unicode-width = "0.1.4"
