@@ -254,7 +254,7 @@ impl FileMap {
             while idx < end_idx {
                 let n =
                     self.non_monospaced_sequences.binary_search_by_key(&idx, |nms| nms.index)
-                    .unwrap_or_else(|n| n + 1);
+                    .unwrap_or_else(|n| n);
                 match self.non_monospaced_sequences.get(n) {
                     Some(nms) =>
                         if nms.contains(end_idx) {
