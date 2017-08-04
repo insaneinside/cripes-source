@@ -9,10 +9,10 @@
 //!
 use std;
 use std::fs;
-use std::str;
 use std::ops::Range;
 use std::path::Path;
 use std::io::Read;
+
 use core::fmt::Display;
 
 use unicode_width::UnicodeWidthChar;
