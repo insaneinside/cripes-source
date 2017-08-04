@@ -40,7 +40,10 @@ pub enum LookupError {
 
 
     /// Requested span crosses a file boundary.
-    BoundaryViolation,
+    FileBoundaryViolation,
+
+    /// Requested span starts or ends in the middle of a codepoint.
+    CodepointBoundaryViolation,
 
     /// Source code for the requested span is unavailable.
     SourceUnavailable
@@ -243,7 +246,7 @@ impl FileMap {
         if ! self.span.intersects(sp) {
             Err(LookupError::InvalidOffset)
         } else if ! self.span.contains(sp) {
-            Err(LookupError::BoundaryViolation)
+            Err(LookupError::FileBoundaryViolation)
         } else {
             let mut w = 0;
             let mut idx = self.offset_to_index(sp.start);
@@ -253,9 +256,16 @@ impl FileMap {
                     self.non_monospaced_sequences.binary_search_by_key(&idx, |nms| nms.index)
                     .unwrap_or_else(|n| n + 1);
                 match self.non_monospaced_sequences.get(n) {
-                    Some(nms) if nms.index < end_idx
-                        => { w += nms.index - idx + nms.display_width as u32;
-                             idx = nms.index + nms.byte_width; }
+                    Some(nms) =>
+                        if nms.contains(end_idx) {
+                            return Err(LookupError::CodepointBoundaryViolation);
+                        } else if end_idx > *nms {
+                            w += nms.index - idx + nms.display_width as u32;
+                            idx = nms.range().end;
+                        } else /* end_idx < *nms */ {
+                            w += end_idx - idx;
+                            break;
+                        },
                     _ => { w += end_idx - idx;
                            break; }
                 }
@@ -273,7 +283,7 @@ impl Mapper<Offset> for FileMap {
         } else if ! self.span.intersects(sp) {
             Err(LookupError::InvalidOffset)
         } else if ! self.span.contains(sp) {
-            Err(LookupError::BoundaryViolation)
+            Err(LookupError::FileBoundaryViolation)
         } else {
             let rel: Range<usize> = sp.relative_to(self.span.start).into();
             Ok(&self.source.as_ref().unwrap()[rel])
@@ -550,7 +560,7 @@ mod tests {
         assert_eq!(Err(LookupError::InvalidOffset),
                    fm.fetch_snippet(span(Offset(6), Offset(8))));
 
-        assert_eq!(Err(LookupError::BoundaryViolation),
+        assert_eq!(Err(LookupError::FileBoundaryViolation),
                    fm.fetch_snippet(span(Offset(3), Offset(8))));
 
         assert_eq!(Err(LookupError::SourceUnavailable),
