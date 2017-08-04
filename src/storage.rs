@@ -18,8 +18,8 @@ use core::fmt::Display;
 use unicode_width::UnicodeWidthChar;
 
 use io;
-use pos::{span, Offset, Index, Span, Contains, RelativeTo};
-use pos::{Line, Column, Loc};
+use pos::{span, Contains,  RangeLike, RelativeTo};
+use pos::{Offset, Index, Span, Line, Column, Loc};
 
 // ----------------------------------------------------------------
 // LookupError
@@ -117,11 +117,29 @@ pub(crate) struct NonMonospacedSequence {
     display_width: u8,
 }
 
+impl RangeLike for NonMonospacedSequence {
+    type Position = Index;
+
+    fn start(&self) -> Self::Position {
+        self.index
+    }
+
+    fn end(&self) -> Self::Position {
+        self.index + self.byte_width
+    }
+}
+
 impl From<(Index, char)> for NonMonospacedSequence {
     fn from((index, c): (Index, char)) -> Self {
         NonMonospacedSequence{index,
                               byte_width: c.len_utf8() as u8,
                               display_width: c.width().unwrap_or(0) as u8}
+    }
+}
+
+impl Contains<Index> for NonMonospacedSequence {
+    fn contains(&self, idx: Index) -> bool {
+        idx >= self.index && idx < self.index + self.byte_width
     }
 }
 

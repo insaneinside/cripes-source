@@ -44,17 +44,33 @@
 //! [`Span`]: struct.Span.html
 
 use std::u16;
-use std::cmp::{min, max};
+use std::cmp::{min, max, Ordering};
 use core::ops::{Add, AddAssign, Sub, SubAssign, Range, Deref};
 
 // ----------------------------------------------------------------
 // Helper traits
-//
-// We use these to allow argument overloading by implementing the traits with
 // different concrete type parameters.
 
+/// Trait for checking if one value "contains" another
 pub trait Contains<T> {
     fn contains(&self, other: T) -> bool;
+}
+
+/// Trait for Range-like types.
+pub trait RangeLike {
+    /// Type used to represent start and end positions within the range.
+    type Position;
+
+    /// Fetch the (included) lower bound of the range.
+    fn start(&self) -> Self::Position;
+
+    /// Fetch the (excluded) upper bound of the range.
+    fn end(&self) -> Self::Position;
+
+    /// Fetch the range covered by the object.
+    fn range(&self) -> Range<Self::Position> {
+        self.start()..self.end()
+    }
 }
 
 // ----------------------------------------------------------------
@@ -282,6 +298,27 @@ impl Into<usize> for Index {
     }
 }
 
+impl<T: Contains<Index>> PartialEq<T> for Index {
+    fn eq(&self, rhs: &T) -> bool {
+        rhs.contains(*self)
+    }
+}
+
+impl<T, U> PartialOrd<U> for Index
+    where Self: PartialOrd<T>,
+          U: RangeLike<Position=T> + Contains<Self>
+{
+    fn partial_cmp(&self, u: &U) -> Option<Ordering> {
+        if *self < u.start() {
+            Some(Ordering::Less)
+        } else if *self >= u.end() {
+            Some(Ordering::Greater)
+        } else {
+            Some(Ordering::Equal)
+        }
+    }
+}
+
 // ----------------------------------------------------------------
 // Span
 
@@ -330,6 +367,16 @@ impl<T> Span<T> where T: Copy + PartialOrd {
               <T as Sub>::Output: Into<usize>
     {
         Into::<usize>::into(self.end - self.start)
+    }
+}
+
+impl<T: Copy> RangeLike for Span<T> {
+    type Position = T;
+    fn start(&self) -> Self::Position {
+        self.start
+    }
+    fn end(&self) -> Self::Position {
+        self.end
     }
 }
 
