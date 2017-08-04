@@ -545,9 +545,12 @@ impl Mapper<Offset> for SourceMap {
 
 #[cfg(test)]
 mod tests {
+    use super::{span, FileMap, LookupError, Index, Offset, Loc, Line, Column};
+    use super::{Grid, Mapper};
 
-    use super::{span, FileMap, Mapper, LookupError, Index, Offset, Loc, Line,
-                Column};
+
+    macro_rules! loc { ($l: expr, $c: expr) => { Loc::at(Line::from_number($l), Column::from_number($c)) }; }
+    macro_rules! line_number { ($l: expr) => { Line::from_number($l) }; }
 
     const ALPHABET_LINES: &'static str = concat!("abcd\n",
                                                  "efgh\n",
@@ -589,10 +592,10 @@ mod tests {
     }
 
     #[test]
-    fn test_file_map_fetch_line() {
+    fn test_file_map_lines() {
         let fm = FileMap::from_source("", ALPHABET_LINES);
         macro_rules! check_line {
-            ($fm: expr, $s: expr, $e: expr, $l: expr) => {
+            ($fm: expr, $n: expr, $s: expr, $e: expr, $l: expr) => {
                 assert_eq!($s, $fm.line_start_offset(Offset($s)).unwrap().0);
                 assert_eq!($s, $fm.line_start_offset(Offset(($s + $e)/2)).unwrap().0);
                 assert_eq!($s, $fm.line_start_offset(Offset($e - 1)).unwrap().0);
@@ -604,41 +607,64 @@ mod tests {
                 assert_eq!($l, $fm.fetch_line(Offset($s)).unwrap());
                 assert_eq!($l, $fm.fetch_line(Offset(($s + $e)/2)).unwrap());
                 assert_eq!($l, $fm.fetch_line(Offset($e - 1)).unwrap());
+
+                for i in $s..$e {
+                    let cl = $l.chars().nth(i as usize - $s).unwrap();
+                    let ca = ALPHABET_LINES.chars().nth(i as usize).unwrap();
+                    assert_eq!(cl, ca);
+
+                    assert_eq!(Ok(line_number!($n)), fm.line_at(Offset(i)),
+                               "wrong line number for offset {} (char {:?})",
+                               i, ca);
+                }
+
             }
         }
-        check_line!(fm, 0, 5, "abcd\n");
-        check_line!(fm, 5, 10, "efgh\n");
-        check_line!(fm, 10, 15, "hijk\n");
-        check_line!(fm, 15, 20, "lmno\n");
-        check_line!(fm, 20, 25, "pqrs\n");
-        check_line!(fm, 25, 30, "tuvw\n");
-        check_line!(fm, 30, 34, "xyz\n");
+        check_line!(fm, 1,  0,  5, "abcd\n");
+        check_line!(fm, 2,  5, 10, "efgh\n");
+        check_line!(fm, 3, 10, 15, "hijk\n");
+        check_line!(fm, 4, 15, 20, "lmno\n");
+        check_line!(fm, 5, 20, 25, "pqrs\n");
+        check_line!(fm, 6, 25, 30, "tuvw\n");
+        check_line!(fm, 7, 30, 34, "xyz\n");
     }
 
     #[test]
-    fn test_file_map_misc() {
+    fn test_file_map_columns() {
         let fm = FileMap::from_source("", ALPHABET_LINES);
         assert_eq!(Ok(4), fm.column_width(fm.fetch_line_span(Offset(2)).unwrap()));
+
+        let fm = FileMap::from_source("", "☠\n");
+        assert_eq!(Err(LookupError::CodepointBoundaryViolation),
+                   fm.column_width(span(Offset(1), Offset(2))));
+        assert_eq!(Ok(0), fm.column_width(span(Offset(1), Offset(2))));
+        assert_eq!(Ok(1), fm.column_width(span(Offset(0), Offset(1))));
     }
 
     #[test]
     fn test_file_map_grid_impl() {
-        use super::Grid;
-        macro_rules! loc { ($l: expr, $c: expr) => { Loc::at(Line::from_number($l), Column::from_number($c)) }; }
-        macro_rules! line_number { ($l: expr) => { Line::from_number($l) }; }
-
         let fm = FileMap::from_source("", ALPHABET_LINES);
+
+        // When fetching the line number for a particular location, offsets and
+        // indices should be treated as referring to the "gaps" between
+        // characters; this means that e.g. Index(0) points to the start of the
+        // first line, while (in `ALPHABET_LINES`) Index(5) points at the
+        // location immediately after the first newline and immediately prior
+        // to the first character on the next line.
         assert_eq!(Ok(line_number!(1)), fm.line_at(Offset(4)));
         assert_eq!(Ok(line_number!(2)), fm.line_at(Offset(5)));
 
         assert_eq!(Ok(Offset(2)), fm.position_at(loc!(1, 3)));
         assert_eq!(Ok(loc!(1, 3)), fm.loc_at(Offset(2)));
 
+        assert_eq!(b'w', ALPHABET_LINES.as_bytes()[28]);
+        assert_eq!(Ok(line_number!(6)), fm.line_at(Offset(25)));
+        assert_eq!(Ok(line_number!(6)), fm.line_at(Offset(27)));
         assert_eq!(Ok(line_number!(6)), fm.line_at(Offset(28)));
         assert_eq!(Ok(line_number!(7)), fm.line_at(Offset(30)));
         assert_eq!(Ok(loc!(7, 1)), fm.loc_at(Offset(30)));
 
-        assert_eq!(Ok(line_number!(8)), fm.line_at(Offset(33)));
+        assert_eq!(Ok(line_number!(7)), fm.line_at(Offset(33)));
         assert_eq!(Err(LookupError::InvalidOffset), fm.line_at(Offset(36)));
 
         assert_eq!(Err(LookupError::InvalidLocation), fm.position_at(loc!(10, 32)));
