@@ -392,12 +392,8 @@ impl Grid<Offset> for FileMap {
                 Ok(n) => Ok(Line::from_index(n + 1)),
 
                 // Err(n) => offset is somewhere in middle of the line
-                Err(n) =>
-                    if self.line_indices.get(n + 1).map(|nlidx| idx == *nlidx - 1u8).unwrap_or(false) {
-                        Ok(Line::from_index(n + 2))
-                    } else {
-                        Ok(Line::from_index(n + 1))
-                    }
+                // (Remember that `binary_search` already adds 1 to the index!)
+                Err(n) => Ok(Line::from_index(n)),
             }
         }
     }
